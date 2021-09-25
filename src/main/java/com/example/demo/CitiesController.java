@@ -31,4 +31,12 @@ public class CitiesController {
 				.filter(c -> c.getCountry().equals("USA"))
 				.map(City::getName);
 	}
+
+	@GetMapping(value = "/cities/stream", produces = MediaType.APPLICATION_STREAM_JSON_VALUE)
+	public Flux<Object> allStream() {
+		return this.repository.findAll()
+				.filter(c -> c.getCountry().equals("USA"))
+				.map(City::getName);
+	}
+
 }
