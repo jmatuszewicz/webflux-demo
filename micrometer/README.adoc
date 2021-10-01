@@ -4,7 +4,7 @@ Configure a loopback Alias so Prometheus can scrape a service running on localho
 and grafana can contact Prometheus (needs to be repeated after reboot):
 
 ----
-sudo ifconfig lo0 alias 10.200.10.1/24
+sudo ifconfig lo:0 10.200.10.1/24 up
 ----
 
 Start Prometheus:

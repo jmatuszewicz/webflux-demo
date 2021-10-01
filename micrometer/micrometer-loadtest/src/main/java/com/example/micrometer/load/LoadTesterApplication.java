@@ -1,48 +1,74 @@
 package com.example.micrometer.load;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import cern.jet.random.Normal;
-import cern.jet.random.engine.MersenneTwister64;
+import org.apache.commons.math3.distribution.NormalDistribution;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Signal;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import org.springframework.web.reactive.function.client.WebClient;
 
 public class LoadTesterApplication {
 
-	private static final Normal RANDOM_DISTRIBUTION = new Normal(250, 50,
-			new MersenneTwister64(0));
+    private static final Logger LOGGER = LoggerFactory.getLogger(LoadTesterApplication.class);
 
-	private static final Duration ONE_SECOND = Duration.ofSeconds(1);
+    private static final NormalDistribution NORMAL_DISTRIBUTION = new NormalDistribution(200, 20);
 
-	private final WebClient client;
+    private static final Duration ONE_SECOND = Duration.ofSeconds(1);
 
-	public LoadTesterApplication() {
-		this.client = WebClient.create("http://localhost:8080/cities");
-	}
+    private final WebClient client;
 
-	public void run() {
-		Flux.fromStream(randomDistributionStream()).delayElements(ONE_SECOND).parallel()
-				.runOn(Schedulers.parallel()).doOnEach(this::sendRequests).subscribe();
-		Flux.never().blockLast();
-	}
+    private final AtomicLong responseCounter;
 
-	private void sendRequests(Signal<Integer> number) {
-		System.out.println("Sending " + number.get() + " requests");
-		for (int i = 0; i < number.get(); i++) {
-			client.get().exchange().block().bodyToMono(String.class).block();
-		}
-	}
+    private final AtomicLong requestCounter;
 
-	private Stream<Integer> randomDistributionStream() {
-		return Stream.iterate(0, (n) -> (int) RANDOM_DISTRIBUTION.nextDouble());
-	}
+    public LoadTesterApplication() {
+        this.client = WebClient.create("http://localhost:8080/cities");
+        this.requestCounter = new AtomicLong(0l);
+        this.responseCounter = new AtomicLong(0l);
+    }
 
-	public static void main(String[] args) {
-		new LoadTesterApplication().run();
-	}
+    public void run() {
+        Flux.fromStream(normalDistributionStream())
+                .delayElements(ONE_SECOND)
+                .parallel()
+                .runOn(Schedulers.parallel())
+                .flatMap(this::sendRequests)
+                .subscribe(this::onResponse);
+        Flux.never().blockLast();
+    }
+
+    private void onResponse(String body) {
+        long counter = responseCounter.incrementAndGet();
+        LOGGER.debug("Response received:  {}  total number of responses: {}", body, counter);
+    }
+
+    private Flux<String> sendRequests(Integer numOfRequests) {
+        LOGGER.info("Sending {} requests", numOfRequests);
+        return Flux.fromStream(IntStream.range(0, numOfRequests).boxed())
+                .flatMap(this::sendRequest);
+    }
+
+    private Mono<String> sendRequest(Integer ind) {
+        long counter = requestCounter.incrementAndGet();
+        LOGGER.debug("Sending request, total number of requests: {}", counter);
+        return client.get()
+                .exchange()
+                .flatMap(clientResponse -> clientResponse.bodyToMono(String.class));
+    }
+
+    private Stream<Integer> normalDistributionStream() {
+        return Stream.iterate(0, i -> (int) NORMAL_DISTRIBUTION.sample());
+    }
+
+    public static void main(String[] args) {
+        new LoadTesterApplication().run();
+    }
 
 }
