@@ -26,17 +26,16 @@ public class CitiesController {
 	}
 
 	@GetMapping(value = "/cities", produces = MediaType.APPLICATION_JSON_VALUE)
-	public Flux<Object> all() {
+	public Flux<City> all() {
+		System.out.println("Received request to /cities");
 		return this.repository.findAll()
-				.filter(c -> c.getCountry().equals("USA"))
-				.map(City::getName);
+				.filter(c -> c.getCountry().equals("USA"));
 	}
 
 	@GetMapping(value = "/cities/stream", produces = MediaType.APPLICATION_STREAM_JSON_VALUE)
-	public Flux<Object> allStream() {
+	public Flux<City> allStream() {
 		return this.repository.findAll()
-				.filter(c -> c.getCountry().equals("USA"))
-				.map(City::getName);
+				.filter(c -> c.getCountry().equals("USA"));
 	}
 
 }
